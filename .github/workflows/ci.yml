@@ -1,0 +1,44 @@
+name: CI
+
+# Added 2026-09-13. Before this, four test files existed and `npm test` ran two
+# of them. test_golden.mjs (byte-identical classic-mode regression, protects
+# shared links) and test_ui.mjs (143 DOM assertions) had never run anywhere.
+#
+# A check nobody runs is not a check.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci || npm install
+
+      - name: Install Playwright browser
+        # test_page and test_ui drive a real DOM
+        run: npx playwright install --with-deps chromium
+
+      - name: Balance invariants
+        run: npm run test:balance
+
+      - name: Page render audit
+        run: npm run test:page
+
+      - name: Golden regression (classic mode must stay byte-identical)
+        run: npm run test:golden
+
+      - name: UI interaction suite
+        run: npm run test:ui

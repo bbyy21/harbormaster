@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# pre-commit — installed 2026-09-13 across all six repos.
+#
+# Before this, `ls .git/hooks | grep -v sample` returned nothing in any repo,
+# while a live GitHub token sat in one repo's history for three months.
+#
+# DESIGN RULES, learned the hard way:
+#   1. FAIL LOUD, NEVER FAIL OPEN. A hook that swallows its own crash is worse
+#      than no hook, because it produces the feeling of protection. If a tool is
+#      missing, this says so on stderr and BLOCKS — it does not quietly pass.
+#   2. BE FAST. A slow hook gets bypassed with --no-verify and then it is dead.
+#      Everything here runs against staged content only.
+#   3. Escape hatch is explicit: SKIP_HOOKS=1 git commit ...
+set -uo pipefail
+
+[ "${SKIP_HOOKS:-0}" = "1" ] && { echo "pre-commit: SKIPPED via SKIP_HOOKS=1" >&2; exit 0; }
+
+fail=0
+say() { printf '  %s\n' "$*" >&2; }
+
+# ---------------------------------------------------------------- secrets ----
+if command -v gitleaks >/dev/null 2>&1; then
+  if ! gitleaks protect --staged --redact --no-banner >/dev/null 2>&1; then
+    echo "" >&2
+    echo "BLOCKED: gitleaks found a secret in staged changes." >&2
+    say "Run: gitleaks protect --staged --verbose"
+    say "Rotate the credential first. A secret in history is forever."
+    fail=1
+  fi
+else
+  echo "" >&2
+  echo "BLOCKED: gitleaks is not installed." >&2
+  say "Install:  brew install gitleaks"
+  say "Override: SKIP_HOOKS=1 git commit ..."
+  say "(Blocking rather than passing is deliberate — a missing scanner is not a clean scan.)"
+  fail=1
+fi
+
+# ------------------------------------------------- account-number shaped ----
+# Not a regex for secrets — a regex for the thing that actually happened:
+# a scratch file with bank account numbers committed by an automation.
+if git diff --cached --name-only --diff-filter=ACM | grep -qiE '^(Untitled|untitled).*\.md$'; then
+  echo "" >&2
+  echo "BLOCKED: committing an Untitled*.md scratch file." >&2
+  say "One of these carried account numbers into git history before."
+  fail=1
+fi
+
+# ------------------------------------------------------------------ lint ----
+# Only what is installed and fast. Never install anything from a hook.
+staged_py=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$' || true)
+if [ -n "$staged_py" ] && command -v ruff >/dev/null 2>&1; then
+  if ! echo "$staged_py" | xargs ruff check --quiet 2>&1 >&2; then
+    say "ruff reported issues above."
+    fail=1
+  fi
+fi
+
+staged_ts=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.tsx?$' || true)
+if [ -n "$staged_ts" ] && [ -f tsconfig.json ] && command -v npx >/dev/null 2>&1; then
+  # Typecheck is the cheapest failing signal in a TS repo. Whole-project, because
+  # per-file tsc is meaningless.
+  if ! npx --no-install tsc --noEmit 2>&1 >&2; then
+    say "tsc reported type errors above."
+    fail=1
+  fi
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo "" >&2
+  echo "pre-commit FAILED. Fix the above, or SKIP_HOOKS=1 git commit ... to override." >&2
+  exit 1
+fi
+exit 0

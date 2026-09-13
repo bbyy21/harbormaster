@@ -24,8 +24,12 @@
     "test": "test"
   },
   "scripts": {
-    "test": "node test/test_balance.mjs \"$PWD\" 100 && node test/test_page.mjs \"$PWD\"",
-    "test:quick": "node test/test_balance.mjs \"$PWD\" 20"
+    "test": "npm run test:balance && npm run test:page && npm run test:golden && npm run test:ui",
+    "test:quick": "node test/test_balance.mjs \"$PWD\" 20",
+    "test:balance": "node test/test_balance.mjs \"$PWD\" 100",
+    "test:page": "node test/test_page.mjs \"$PWD\"",
+    "test:golden": "node test/test_golden.mjs \"$PWD\"",
+    "test:ui": "node test/test_ui.mjs \"$PWD\""
   },
   "devDependencies": {
     "gifenc": "^1.0.3",

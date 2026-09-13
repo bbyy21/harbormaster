@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# commit-msg — installed 2026-09-13 across all six repos.
+#
+# Enforces the one rule in this founder's system with a perfect record: a rule
+# whose violation is a searchable string. "Never add an AI co-author trailer"
+# has held with zero recorded violations — because it can be grepped, not
+# because anyone remembered it. This makes the grep the mechanism.
+#
+# Escape hatch: SKIP_HOOKS=1 git commit ...
+set -uo pipefail
+
+[ "${SKIP_HOOKS:-0}" = "1" ] && exit 0
+
+msg_file="$1"
+[ -f "$msg_file" ] || exit 0
+
+if grep -qiE '(co-authored-by:.*(claude|anthropic)|generated with \[?claude|🤖 generated)' "$msg_file"; then
+  echo "" >&2
+  echo "BLOCKED: AI co-author trailer in the commit message." >&2
+  echo "  This repo's rule: no Co-Authored-By Claude/Anthropic lines, ever." >&2
+  echo "  Remove the trailer and commit again." >&2
+  exit 1
+fi
+
+# Empty message check — cheap, catches an accidental editor close.
+# Strip comment lines FIRST, then look for content. The earlier version tested
+# for "any character that is not space or #", so a line like "# comment only"
+# passed because it contains letters. Caught by planting the fault, 2026-09-13.
+if ! grep -vE '^\s*#' "$msg_file" | grep -qE '[^[:space:]]'; then
+  echo "BLOCKED: empty commit message." >&2
+  exit 1
+fi
+
+exit 0
