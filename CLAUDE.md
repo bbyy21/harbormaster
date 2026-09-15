@@ -176,3 +176,14 @@ submission, Bing import, Reddit/BGG backlinks.
 - Group plays both 4p and 6p; fairness is the whole product. User feedback so far:
   short names, simple scannable explanations (the in-page "cheat sheet"
   card — keep that style), ports must match their physical frame exactly.
+
+## Build tier: T1
+
+AI builds it end to end. Shipped; also a Koduo dogfood repo.
+
+**Default tools for this repo:** tdd · refactor-clean · build-error-resolver
+
+*Recorded 2026-09-15, confirmed by Sushobhith. This exists because the tiering
+previously lived only in a chat session, so every new session re-guessed it from
+how the code looked — which is wrong for any project whose intent differs from
+its current state. Tier is an intent, not an observation. Change it here.*
