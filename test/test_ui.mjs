@@ -102,6 +102,62 @@ const board2 = await page2.evaluate(() => document.getElementById('board').inner
 check('copy link: identical board on reopen', board2 === orig.board);
 await page2.close();
 
+// --- 5b. copy link round-trip: np=1 (fair / no-port mode) ---
+await load('#s=nplink&p=4&np=1');
+const origNp = await snap();
+await page.click('#copy');
+const linkNp = await page.evaluate(async () => {
+  try { const t = await navigator.clipboard.readText(); if (t.includes('#s=')) return t; } catch (_) {}
+  const b = document.getElementById('copy').textContent;
+  return b.includes('#s=') ? b : location.href;
+});
+check('copy link np=1: contains np=1', linkNp.includes('np=1'), linkNp);
+check('copy link np=1: does not contain m=board', !linkNp.includes('m=board'), linkNp);
+const pageNp = await ctx.newPage();
+await pageNp.goto(linkNp);
+await pageNp.waitForFunction(() => document.querySelectorAll('#board polygon').length > 0);
+const boardNp = await pageNp.evaluate(() => document.getElementById('board').innerHTML);
+const housesNp = await pageNp.evaluate(() => document.querySelectorAll('#board g path[d^="M -8 8"]').length);
+check('copy link np=1: identical board on reopen', boardNp === origNp.board);
+check('copy link np=1: same house count on reopen', housesNp === origNp.houses);
+check('copy link np=1: noPorts button aria-pressed', await pageNp.evaluate(() =>
+  document.getElementById('noPorts').getAttribute('aria-pressed') === 'true'));
+await pageNp.close();
+
+// --- 5c. copy link round-trip: m=board mode ---
+await load('#s=boardlink&p=4&m=board');
+const origBoard = await snap();
+await page.click('#copy');
+const linkBoard = await page.evaluate(async () => {
+  try { const t = await navigator.clipboard.readText(); if (t.includes('#s=')) return t; } catch (_) {}
+  const b = document.getElementById('copy').textContent;
+  return b.includes('#s=') ? b : location.href;
+});
+check('copy link m=board: contains m=board', linkBoard.includes('m=board'), linkBoard);
+check('copy link m=board: does not contain np=1', !linkBoard.includes('np=1'), linkBoard);
+const pageBoard = await ctx.newPage();
+await pageBoard.goto(linkBoard);
+await pageBoard.waitForFunction(() => document.querySelectorAll('#board polygon').length > 0);
+const boardBoard = await pageBoard.evaluate(() => document.getElementById('board').innerHTML);
+const housesBoard = await pageBoard.evaluate(() => document.querySelectorAll('#board g path[d^="M -8 8"]').length);
+const pressedBoard = await pageBoard.evaluate(() =>
+  [...document.querySelectorAll('.seg button[aria-pressed="true"]')].map(b => b.textContent.trim()));
+check('copy link m=board: identical board on reopen', boardBoard === origBoard.board);
+check('copy link m=board: zero houses on reopen', housesBoard === 0);
+check('copy link m=board: Board only pressed on reopen', pressedBoard.includes('Board only'));
+await pageBoard.close();
+
+// --- 5d. copy link round-trip: plain link has neither np=1 nor m=board ---
+await load('#s=cleanlink&p=4');
+await page.click('#copy');
+const linkClean = await page.evaluate(async () => {
+  try { const t = await navigator.clipboard.readText(); if (t.includes('#s=')) return t; } catch (_) {}
+  const b = document.getElementById('copy').textContent;
+  return b.includes('#s=') ? b : location.href;
+});
+check('copy link plain: no np=1', !linkClean.includes('np=1'), linkClean);
+check('copy link plain: no m=board', !linkClean.includes('m=board'), linkClean);
+
 // --- 6. hash round-trip: board-only sea link restores all toggles ---
 await load('#s=abc&p=6&m=board&map=sea');
 s = await snap();
